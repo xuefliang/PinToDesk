@@ -145,6 +145,8 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
                                     <!-- 完成复选框 -->
@@ -208,14 +210,36 @@
                                             Click="DeleteBtn_Click"
                                             Visibility="Hidden"
                                             ToolTip="删除"/>
+
+                                    <!-- 上移按钮（悬停时显示） -->
+                                    <Button x:Name="MoveUpBtn"
+                                            Grid.Column="6"
+                                            Content="▲"
+                                            Style="{StaticResource ActionBtn}"
+                                            Tag="{Binding Id}"
+                                            Click="MoveUpBtn_Click"
+                                            Visibility="Hidden"
+                                            ToolTip="上移"/>
+
+                                    <!-- 下移按钮（悬停时显示） -->
+                                    <Button x:Name="MoveDownBtn"
+                                            Grid.Column="7"
+                                            Content="▼"
+                                            Style="{StaticResource ActionBtn}"
+                                            Tag="{Binding Id}"
+                                            Click="MoveDownBtn_Click"
+                                            Visibility="Hidden"
+                                            ToolTip="下移"/>
                                 </Grid>
 
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding IsMouseOver,
                                                  RelativeSource={RelativeSource AncestorType=ListViewItem}}"
                                                  Value="True">
-                                        <Setter TargetName="EditBtn"   Property="Visibility" Value="Visible"/>
-                                        <Setter TargetName="DeleteBtn" Property="Visibility" Value="Visible"/>
+                                        <Setter TargetName="EditBtn"    Property="Visibility" Value="Visible"/>
+                                        <Setter TargetName="DeleteBtn"  Property="Visibility" Value="Visible"/>
+                                        <Setter TargetName="MoveUpBtn"  Property="Visibility" Value="Visible"/>
+                                        <Setter TargetName="MoveDownBtn" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>

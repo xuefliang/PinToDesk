@@ -600,6 +600,32 @@ namespace PinToDesk
             if (item != null) { _items.Remove(item); _storage.SaveTodos(_items); }
         }
 
+        private void MoveUpBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var id = (Guid)((WinButton)sender).Tag;
+            var item = _items.FirstOrDefault(i => i.Id == id);
+            if (item == null) return;
+            int idx = _items.IndexOf(item);
+            if (idx > 0)
+            {
+                _items.Move(idx, idx - 1);
+                _storage.SaveTodos(_items);
+            }
+        }
+
+        private void MoveDownBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var id = (Guid)((WinButton)sender).Tag;
+            var item = _items.FirstOrDefault(i => i.Id == id);
+            if (item == null) return;
+            int idx = _items.IndexOf(item);
+            if (idx < _items.Count - 1)
+            {
+                _items.Move(idx, idx + 1);
+                _storage.SaveTodos(_items);
+            }
+        }
+
         // ══════════════════════════════════════════════
         // 拖拽排序（上移/下移一位）
         // ══════════════════════════════════════════════
