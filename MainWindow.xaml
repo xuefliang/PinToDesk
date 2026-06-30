@@ -92,10 +92,12 @@
                               FocusVisualStyle="{x:Null}"
                               IsTabStop="False"
                               AllowDrop="True"
-                              MouseDoubleClick="TodoList_MouseDoubleClick"
-                              PreviewMouseLeftButtonDown="TodoList_PreviewMouseLeftButtonDown"
-                              PreviewMouseMove="TodoList_PreviewMouseMove"
-                              Drop="TodoList_Drop">
+                               MouseDoubleClick="TodoList_MouseDoubleClick"
+                               PreviewMouseLeftButtonDown="TodoList_PreviewMouseLeftButtonDown"
+                               PreviewMouseMove="TodoList_PreviewMouseMove"
+                               GiveFeedback="TodoList_GiveFeedback"
+                               QueryContinueDrag="TodoList_QueryContinueDrag"
+                               Drop="TodoList_Drop">
 
                         <!-- 使用自定义 ScrollViewer（细滚动条，自动隐藏） -->
                         <ListView.Template>

@@ -584,9 +584,30 @@ namespace PinToDesk
             _dragItem = null;
         }
 
+        // 拖动时显示移动光标
+        private void TodoList_GiveFeedback(object sender, GiveFeedbackEventArgs e)
+        {
+            if (e.Effects.HasFlag(WinDropEffects.Move))
+            {
+                e.UseDefaultCursors = false;
+                Mouse.OverrideCursor = Cursors.SizeAll;
+            }
+            e.Handled = true;
+        }
+
+        // 拖动结束时恢复光标
+        private void TodoList_QueryContinueDrag(object sender, QueryContinueDragEventArgs e)
+        {
+            if (e.Action == DragAction.Cancel || e.Action == DragAction.Drop)
+            {
+                Mouse.OverrideCursor = null;
+            }
+        }
+
         private void TodoList_Drop(object sender, WinDrag e)
         {
             if (_dragItem == null) return;
+            Mouse.OverrideCursor = null;
             var target = (e.OriginalSource as FrameworkElement)?.DataContext as TodoItem;
             if (target == null || target == _dragItem) return;
             var oldIdx = _items.IndexOf(_dragItem);
