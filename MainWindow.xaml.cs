@@ -33,10 +33,6 @@ namespace PinToDesk
         // 集合视图（过滤已完成条目）
         private ICollectionView? _todoView;
 
-        // 拖拽排序（上移/下移一位）
-        private WinPoint  _dragStart;
-        private TodoItem? _dragItem;
-
         // 窗口调整大小
         private bool _isResizing;
         private WinPoint _resizeStart;
@@ -147,11 +143,17 @@ namespace PinToDesk
         // ══════════════════════════════════════════════
         // 窗口初始化：挂钩 WndProc
         // ══════════════════════════════════════════════
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint dwAffinity);
+        private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
+
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            var hwndSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var hwndSource = HwndSource.FromHwnd(hwnd);
             hwndSource?.AddHook(WndProc);
+            SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -624,57 +626,6 @@ namespace PinToDesk
                 _items.Move(idx, idx + 1);
                 _storage.SaveTodos(_items);
             }
-        }
-
-        // ══════════════════════════════════════════════
-        // 拖拽排序（上移/下移一位）
-        // ══════════════════════════════════════════════
-        private void TodoList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            var src = e.OriginalSource as DependencyObject;
-            while (src != null)
-            {
-                if (src is FrameworkElement fe && fe.Tag as string == "DRAG_HANDLE")
-                {
-                    _dragStart = e.GetPosition(null);
-                    _dragItem = fe.DataContext as TodoItem;
-                    TodoList.CaptureMouse();
-                    return;
-                }
-                src = System.Windows.Media.VisualTreeHelper.GetParent(src);
-            }
-            _dragItem = null;
-        }
-
-        private void TodoList_PreviewMouseMove(object sender, WinMouse e)
-        {
-            if (_dragItem == null) return;
-            if (e.LeftButton != MouseButtonState.Pressed)
-            {
-                _dragItem = null;
-                TodoList.ReleaseMouseCapture();
-                return;
-            }
-
-            var pos = e.GetPosition(null);
-            var delta = pos - _dragStart;
-            if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance &&
-                Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance) return;
-
-            int oldIdx = _items.IndexOf(_dragItem);
-            if (delta.Y < 0 && oldIdx > 0)
-                _items.Move(oldIdx, oldIdx - 1);
-            else if (delta.Y > 0 && oldIdx < _items.Count - 1)
-                _items.Move(oldIdx, oldIdx + 1);
-
-            _storage.SaveTodos(_items);
-            _dragItem = null;
-            TodoList.ReleaseMouseCapture();
-        }
-
-        private void TodoList_LostMouseCapture(object sender, WinMouse e)
-        {
-            _dragItem = null;
         }
 
         private void LoadSettings()
