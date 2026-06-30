@@ -20,6 +20,7 @@ using WinMouse       = System.Windows.Input.MouseEventArgs;
 using WinDrag        = System.Windows.DragEventArgs;
 using WinButton      = System.Windows.Controls.Button;
 using WinDropEffects = System.Windows.DragDropEffects;
+using MessageBox     = System.Windows.MessageBox;
 
 namespace PinToDesk
 {
