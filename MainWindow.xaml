@@ -91,13 +91,11 @@
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                               FocusVisualStyle="{x:Null}"
                               IsTabStop="False"
-                              AllowDrop="True"
-                               MouseDoubleClick="TodoList_MouseDoubleClick"
-                               PreviewMouseLeftButtonDown="TodoList_PreviewMouseLeftButtonDown"
-                               PreviewMouseMove="TodoList_PreviewMouseMove"
-                               GiveFeedback="TodoList_GiveFeedback"
-                               QueryContinueDrag="TodoList_QueryContinueDrag"
-                               Drop="TodoList_Drop">
+                                MouseDoubleClick="TodoList_MouseDoubleClick"
+                                PreviewMouseLeftButtonDown="TodoList_PreviewMouseLeftButtonDown"
+                                PreviewMouseMove="TodoList_PreviewMouseMove"
+                                PreviewMouseLeftButtonUp="TodoList_PreviewMouseLeftButtonUp"
+                                LostMouseCapture="TodoList_LostMouseCapture">
 
                         <!-- 使用自定义 ScrollViewer（细滚动条，自动隐藏） -->
                         <ListView.Template>
@@ -175,13 +173,22 @@
                                                Foreground="#222"
                                                TextWrapping="Wrap"/>
 
-                                    <!-- 拖动手柄（始终可见） -->
-                                    <Button x:Name="DragHandleBtn"
+                                    <!-- 拖动手柄（始终可见，非交互式元素避免干扰鼠标事件） -->
+                                    <Border x:Name="DragHandleBtn"
                                             Grid.Column="3"
-                                            Content="="
-                                            Style="{StaticResource DragHandleBtn}"
                                             Cursor="SizeAll"
-                                            ToolTip="拖动排序"/>
+                                            ToolTip="拖动排序"
+                                            Width="18" Height="22"
+                                            Background="Transparent"
+                                            CornerRadius="3"
+                                            Tag="DRAG_HANDLE">
+                                        <TextBlock Text="="
+                                                   Foreground="#AAA"
+                                                   FontSize="12"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
 
                                     <!-- 编辑按钮（悬停时显示） -->
                                     <Button x:Name="EditBtn"

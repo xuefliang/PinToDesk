@@ -17,13 +17,7 @@ using PinToDesk.Services;
 using WinPoint       = System.Windows.Point;
 using WinKey         = System.Windows.Input.KeyEventArgs;
 using WinMouse       = System.Windows.Input.MouseEventArgs;
-using WinDrag        = System.Windows.DragEventArgs;
 using WinButton      = System.Windows.Controls.Button;
-using WinDropEffects = System.Windows.DragDropEffects;
-using WinGiveFeedback  = System.Windows.GiveFeedbackEventArgs;
-using WinQueryDrag     = System.Windows.QueryContinueDragEventArgs;
-using WinDragAction    = System.Windows.DragAction;
-using WinCursors       = System.Windows.Input.Cursors;
 using MessageBox       = System.Windows.MessageBox;
 
 namespace PinToDesk
@@ -39,9 +33,10 @@ namespace PinToDesk
         // 集合视图（过滤已完成条目）
         private ICollectionView? _todoView;
 
-        // 拖拽排序
+        // 拖拽排序（实时重排，被拖项跟随光标）
         private WinPoint  _dragStart;
         private TodoItem? _dragItem;
+        private bool      _isDragging;
 
         // 窗口调整大小
         private bool _isResizing;
@@ -64,6 +59,7 @@ namespace PinToDesk
         private const int WM_MOVING             = 0x0216;
         private const int WM_SYSCOMMAND         = 0x0112;
         private const int WM_WINDOWPOSCHANGING  = 0x0046;
+        private const int WM_SHOWWINDOW         = 0x0018;
         private const int SC_MINIMIZE           = 0xF020;
         private static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
 
@@ -161,32 +157,43 @@ namespace PinToDesk
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            if (msg == WM_SYSCOMMAND && _isDesktopMode)
+            // 阻止系统最小化（如 Win+D 通过 ShowWindow(SW_MINIMIZE) 调用）
+            if (msg == WM_SYSCOMMAND)
             {
                 int cmd = wParam.ToInt32() & 0xFFF0;
-                if (cmd == SC_MINIMIZE)
+                if (cmd == SC_MINIMIZE && !_allowHide)
                 {
                     handled = true;
                     return IntPtr.Zero;
                 }
             }
 
-            if (msg == WM_WINDOWPOSCHANGING && _isDesktopMode)
+            // 阻止系统隐藏（如 Win+D 对工具窗口使用 SW_HIDE）
+            if (msg == WM_SHOWWINDOW && wParam == IntPtr.Zero && !_allowHide)
+            {
+                handled = true;
+                return IntPtr.Zero;
+            }
+
+            if (msg == WM_WINDOWPOSCHANGING)
             {
                 var wp = (WINDOWPOS)Marshal.PtrToStructure(lParam, typeof(WINDOWPOS))!;
 
-                // 阻止系统隐藏窗口（如 Win+D），但放行用户主动隐藏
+                // 始终阻止系统隐藏窗口（如 Win+D），但放行用户主动隐藏
                 if ((wp.flags & SWP_HIDEWINDOW) != 0 && !_allowHide)
                 {
                     handled = true;
                     return IntPtr.Zero;
                 }
 
-                // 强制窗口保持在桌面层
-                if ((wp.flags & SWP_NOZORDER) == 0 && wp.hwndInsertAfter != HWND_BOTTOM)
+                if (_isDesktopMode)
                 {
-                    wp.hwndInsertAfter = HWND_BOTTOM;
-                    Marshal.StructureToPtr(wp, lParam, true);
+                    // 强制窗口保持在桌面层
+                    if ((wp.flags & SWP_NOZORDER) == 0 && wp.hwndInsertAfter != HWND_BOTTOM)
+                    {
+                        wp.hwndInsertAfter = HWND_BOTTOM;
+                        Marshal.StructureToPtr(wp, lParam, true);
+                    }
                 }
                 return IntPtr.Zero;
             }
@@ -595,65 +602,92 @@ namespace PinToDesk
         }
 
         // ══════════════════════════════════════════════
-        // 拖拽排序
+        // 拖拽排序（实时重排，被拖项跟随光标移动）
         // ══════════════════════════════════════════════
         private void TodoList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // 只从拖动手柄触发拖动
             var src = e.OriginalSource as DependencyObject;
             while (src != null)
             {
-                if (src is FrameworkElement fe && fe.Name == "DragHandleBtn")
+                if (src is FrameworkElement fe && fe.Tag as string == "DRAG_HANDLE")
                 {
                     _dragStart = e.GetPosition(null);
-                    _dragItem = (e.OriginalSource as FrameworkElement)?.DataContext as TodoItem;
+                    _dragItem = fe.DataContext as TodoItem;
+                    _isDragging = false;
+                    TodoList.CaptureMouse();
                     return;
                 }
                 src = System.Windows.Media.VisualTreeHelper.GetParent(src);
             }
             _dragItem = null;
+            _isDragging = false;
         }
 
         private void TodoList_PreviewMouseMove(object sender, WinMouse e)
         {
-            if (_dragItem == null || e.LeftButton != MouseButtonState.Pressed) return;
-            var pos   = e.GetPosition(null);
-            var delta = pos - _dragStart;
-            if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance &&
-                Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance) return;
-            DragDrop.DoDragDrop(TodoList, _dragItem, WinDropEffects.Move);
-            _dragItem = null;
+            if (_dragItem == null) return;
+            if (e.LeftButton != MouseButtonState.Pressed)
+            {
+                CancelDrag();
+                return;
+            }
+
+            if (!_isDragging)
+            {
+                var pos = e.GetPosition(null);
+                var delta = pos - _dragStart;
+                if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                    Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+                _isDragging = true;
+            }
+
+            int newIdx = CalculateDropIndex(e.GetPosition(TodoList).Y);
+            int oldIdx = _items.IndexOf(_dragItem);
+            if (oldIdx >= 0 && newIdx >= 0 && oldIdx != newIdx)
+                _items.Move(oldIdx, newIdx);
         }
 
-        // 拖动时显示移动光标
-        private void TodoList_GiveFeedback(object sender, WinGiveFeedback e)
+        private void TodoList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (e.Effects.HasFlag(WinDropEffects.Move))
-            {
-                e.UseDefaultCursors = false;
-                Mouse.OverrideCursor = WinCursors.SizeAll;
-            }
+            if (!_isDragging) return;
+            FinalizeDrag();
             e.Handled = true;
         }
 
-        // 拖动结束时恢复光标
-        private void TodoList_QueryContinueDrag(object sender, WinQueryDrag e)
+        private void TodoList_LostMouseCapture(object sender, MouseEventArgs e)
         {
-            if (e.Action == WinDragAction.Cancel || e.Action == WinDragAction.Drop)
-            {
-                Mouse.OverrideCursor = null;
-            }
+            if (_isDragging) CancelDrag();
         }
 
-        private void TodoList_Drop(object sender, WinDrag e)
+        private int CalculateDropIndex(double y)
         {
-            if (_dragItem == null) return;
-            Mouse.OverrideCursor = null;
-            var target = (e.OriginalSource as FrameworkElement)?.DataContext as TodoItem;
-            if (target == null || target == _dragItem) return;
-            var oldIdx = _items.IndexOf(_dragItem);
-            var newIdx = _items.IndexOf(target);
-            if (oldIdx >= 0 && newIdx >= 0) { _items.Move(oldIdx, newIdx); _storage.SaveTodos(_items); }
+            var activeItems = _items.Where(i => !i.IsCompleted).ToList();
+            for (int i = 0; i < activeItems.Count; i++)
+            {
+                var container = TodoList.ItemContainerGenerator.ContainerFromIndex(i) as ListViewItem;
+                if (container == null) continue;
+                var pos = container.TransformToAncestor(TodoList).Transform(new Point(0, 0));
+                if (y < pos.Y + container.ActualHeight / 2)
+                    return _items.IndexOf(activeItems[i]);
+            }
+            var last = activeItems.LastOrDefault();
+            return last != null ? _items.IndexOf(last) + 1 : 0;
+        }
+
+        private void CancelDrag()
+        {
+            _dragItem = null;
+            _isDragging = false;
+            TodoList.ReleaseMouseCapture();
+        }
+
+        private void FinalizeDrag()
+        {
+            if (_dragItem != null)
+                _storage.SaveTodos(_items);
+            _dragItem = null;
+            _isDragging = false;
+            TodoList.ReleaseMouseCapture();
         }
 
         private void LoadSettings()
