@@ -72,7 +72,7 @@ struct ContentView: View {
                     }
 
                     ForEach(store.activeItems) { item in
-                        TodoRowView(item: item)
+                        TodoRowView(item: item, onEdit: { editingItem = item; showEditSheet = true })
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)

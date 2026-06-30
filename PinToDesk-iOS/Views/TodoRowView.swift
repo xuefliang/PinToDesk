@@ -3,6 +3,7 @@ import SwiftUI
 struct TodoRowView: View {
     @EnvironmentObject private var store: TodoStore
     let item: TodoItem
+    let onEdit: () -> Void
     @State private var showActions = false
 
     var body: some View {
@@ -32,6 +33,15 @@ struct TodoRowView: View {
                 .foregroundColor(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(10)
+
+            // 编辑
+            Button(action: onEdit) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.secondary.opacity(0.6))
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.plain)
 
             // 上移
             Button(action: { store.moveUp(item) }) {
