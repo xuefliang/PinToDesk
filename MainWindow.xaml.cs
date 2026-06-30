@@ -20,9 +20,11 @@ using WinMouse       = System.Windows.Input.MouseEventArgs;
 using WinDrag        = System.Windows.DragEventArgs;
 using WinButton      = System.Windows.Controls.Button;
 using WinDropEffects = System.Windows.DragDropEffects;
-using WinGiveFeedback = System.Windows.GiveFeedbackEventArgs;
-using WinQueryDrag   = System.Windows.QueryContinueDragEventArgs;
-using MessageBox     = System.Windows.MessageBox;
+using WinGiveFeedback  = System.Windows.GiveFeedbackEventArgs;
+using WinQueryDrag     = System.Windows.QueryContinueDragEventArgs;
+using WinDragAction    = System.Windows.DragAction;
+using WinCursors       = System.Windows.Input.Cursors;
+using MessageBox       = System.Windows.MessageBox;
 
 namespace PinToDesk
 {
@@ -592,7 +594,7 @@ namespace PinToDesk
             if (e.Effects.HasFlag(WinDropEffects.Move))
             {
                 e.UseDefaultCursors = false;
-                Mouse.OverrideCursor = Cursors.SizeAll;
+                Mouse.OverrideCursor = WinCursors.SizeAll;
             }
             e.Handled = true;
         }
@@ -600,7 +602,7 @@ namespace PinToDesk
         // 拖动结束时恢复光标
         private void TodoList_QueryContinueDrag(object sender, WinQueryDrag e)
         {
-            if (e.Action == DragAction.Cancel || e.Action == DragAction.Drop)
+            if (e.Action == WinDragAction.Cancel || e.Action == WinDragAction.Drop)
             {
                 Mouse.OverrideCursor = null;
             }
