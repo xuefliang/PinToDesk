@@ -34,6 +34,7 @@ jobs:
 
       - name: Compile (debug, no signing)
         run: |
+          set -o pipefail
           xcodebuild build \
             -project PinToDesk.xcodeproj \
             -scheme PinToDesk \
@@ -45,6 +46,7 @@ jobs:
 
       - name: Archive (unsigned)
         run: |
+          set -o pipefail
           xcodebuild archive \
             -project PinToDesk.xcodeproj \
             -scheme PinToDesk \
@@ -55,10 +57,29 @@ jobs:
             CODE_SIGNING_ALLOWED="NO" \
             CODE_SIGNING_REQUIRED="NO" | xcpretty
 
+      - name: Debug - list archive contents
+        if: always()
+        run: |
+          echo "=== RUNNER_TEMP ==="
+          ls -la "$RUNNER_TEMP" || true
+          echo "=== Archive path ==="
+          ls -la "$RUNNER_TEMP/PinToDesk.xcarchive" || true
+          echo "=== Products tree ==="
+          find "$RUNNER_TEMP/PinToDesk.xcarchive" -maxdepth 5 -name "*.app" 2>/dev/null || true
+          echo "=== Full tree ==="
+          find "$RUNNER_TEMP/PinToDesk.xcarchive" -maxdepth 4 2>/dev/null || true
+
       - name: Export unsigned .app bundle
         run: |
           mkdir -p $RUNNER_TEMP/export
-          cp -R "$RUNNER_TEMP/PinToDesk.xcarchive/Products/Applications/PinToDesk.app" $RUNNER_TEMP/export/
+          # Try multiple possible .app locations
+          APP_PATH=$(find "$RUNNER_TEMP/PinToDesk.xcarchive" -name "*.app" -type d -maxdepth 5 2>/dev/null | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: No .app found in archive"
+            exit 1
+          fi
+          echo "Found app at: $APP_PATH"
+          cp -R "$APP_PATH" $RUNNER_TEMP/export/
           cd $RUNNER_TEMP/export
           zip -r PinToDesk.zip PinToDesk.app
 
