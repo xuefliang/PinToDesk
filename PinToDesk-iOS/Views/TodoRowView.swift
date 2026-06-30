@@ -4,7 +4,6 @@ struct TodoRowView: View {
     @EnvironmentObject private var store: TodoStore
     let item: TodoItem
     let onEdit: () -> Void
-    @State private var showActions = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -69,7 +68,7 @@ struct TodoRowView: View {
         )
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
-            showActions = true
+            onEdit()
         }
     }
 }

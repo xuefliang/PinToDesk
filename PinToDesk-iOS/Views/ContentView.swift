@@ -157,7 +157,7 @@ struct ContentView: View {
         }
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: [.plainText],
+            allowedContentTypes: [.plainText, .markdown],
             allowsMultipleSelection: false
         ) { result in
             switch result {
@@ -169,6 +169,8 @@ struct ContentView: View {
                    let text = String(data: data, encoding: .utf8) {
                     let count = store.importFromMarkdown(text)
                     importMessage = "导入了 \(count) 条新待办"
+                } else {
+                    importMessage = "导入失败：文件读取错误"
                 }
             case .failure:
                 importMessage = "导入失败"
