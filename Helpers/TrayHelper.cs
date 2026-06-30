@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows;
 using System.Windows.Forms;
+using PinToDesk;
 
 namespace PinToDesk.Helpers
 {
@@ -51,7 +52,7 @@ namespace PinToDesk.Helpers
             _itemHide = new ToolStripMenuItem("隐藏");
             _itemHide.Click += (s, e) =>
             {
-                _window.Dispatcher.Invoke(() => _window.Hide());
+                _window.Dispatcher.Invoke(() => ((MainWindow)_window).TrayHide());
             };
 
             _itemPin = new ToolStripMenuItem("置顶");
@@ -149,7 +150,7 @@ namespace PinToDesk.Helpers
                     _clickTimer.Stop();
                     _window.Dispatcher.Invoke(() =>
                     {
-                        _window.Hide();
+                        ((MainWindow)_window).TrayHide();
                     });
                 }
             };

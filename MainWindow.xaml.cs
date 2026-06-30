@@ -51,6 +51,7 @@ namespace PinToDesk
         // 置顶 / 桌面模式（独立状态）
         private bool _isPinned      = false;
         private bool _isDesktopMode = false;
+        private bool _allowHide     = false;   // 用户主动隐藏时设为 true
 
         // 托盘引用（用于同步状态）
         private TrayHelper? _tray;
@@ -74,6 +75,7 @@ namespace PinToDesk
         private const uint SWP_NOMOVE     = 0x0002;
         private const uint SWP_NOZORDER   = 0x0004;
         private const uint SWP_NOACTIVATE = 0x0010;
+        private const uint SWP_HIDEWINDOW = 0x0080;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct WINDOWPOS
@@ -140,6 +142,11 @@ namespace PinToDesk
                 UpdateEmptyPlaceholder();
                 SetTitleButtonsOpacity((_isPinned || _isDesktopMode) ? 1 : 0);
             };
+
+            IsVisibleChanged += (s, e) =>
+            {
+                if (!IsVisible) _allowHide = false;
+            };
         }
 
         // ══════════════════════════════════════════════
@@ -167,6 +174,15 @@ namespace PinToDesk
             if (msg == WM_WINDOWPOSCHANGING && _isDesktopMode)
             {
                 var wp = (WINDOWPOS)Marshal.PtrToStructure(lParam, typeof(WINDOWPOS))!;
+
+                // 阻止系统隐藏窗口（如 Win+D），但放行用户主动隐藏
+                if ((wp.flags & SWP_HIDEWINDOW) != 0 && !_allowHide)
+                {
+                    handled = true;
+                    return IntPtr.Zero;
+                }
+
+                // 强制窗口保持在桌面层
                 if ((wp.flags & SWP_NOZORDER) == 0 && wp.hwndInsertAfter != HWND_BOTTOM)
                 {
                     wp.hwndInsertAfter = HWND_BOTTOM;
@@ -250,7 +266,17 @@ namespace PinToDesk
         // ══════════════════════════════════════════════
         // 标题栏按钮
         // ══════════════════════════════════════════════
-        private void CloseBtn_Click(object sender, RoutedEventArgs e) => Hide();
+        private void CloseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            _allowHide = true;
+            Hide();
+        }
+
+        public void TrayHide()
+        {
+            _allowHide = true;
+            Hide();
+        }
 
         private void PinBtn_Click(object sender, RoutedEventArgs e)
         {
