@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var store: TodoStore
@@ -7,22 +8,9 @@ struct ContentView: View {
     @State private var showCompleted = false
     @State private var showEditSheet = false
     @State private var editingItem: TodoItem?
-
-    private var markdownExport: String {
-        var md = "# PinToDesk 导出\n\n"
-        md += "## 待办事项\n"
-        for item in store.activeItems {
-            md += "- [ ] \(item.title)\n"
-        }
-        let completed = store.completedItems
-        if !completed.isEmpty {
-            md += "\n## 已完成\n"
-            for item in completed {
-                md += "- [x] \(item.title)\n"
-            }
-        }
-        return md
-    }
+    @State private var showImporter = false
+    @State private var showExporter = false
+    @State private var importMessage: String? = nil
 
     var body: some View {
         ZStack {
@@ -36,7 +24,16 @@ struct ContentView: View {
                         .foregroundColor(.primary)
                     Spacer()
 
-                    ShareLink(item: markdownExport, preview: SharePreview("PinToDesk 导出")) {
+                    // 导入按钮
+                    Button(action: { showImporter = true }) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(width: 32, height: 32)
+
+                    // 导出按钮
+                    Button(action: { showExporter = true }) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 14))
                             .foregroundColor(.secondary)
@@ -158,6 +155,44 @@ struct ContentView: View {
                 EditTodoView(item: item)
             }
         }
+        .fileImporter(
+            isPresented: $showImporter,
+            allowedContentTypes: [.plainText],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                guard url.startAccessingSecurityScopedResource() else { return }
+                defer { url.stopAccessingSecurityScopedResource() }
+                if let data = try? Data(contentsOf: url),
+                   let text = String(data: data, encoding: .utf8) {
+                    let count = store.importFromMarkdown(text)
+                    importMessage = "导入了 \(count) 条新待办"
+                }
+            case .failure:
+                importMessage = "导入失败"
+            }
+        }
+        .fileExporter(
+            isPresented: $showExporter,
+            document: TextFileDocument(text: store.exportToMarkdown()),
+            contentType: .plainText,
+            defaultFilename: "PinToDesk-导出"
+        ) { result in
+            switch result {
+            case .success: importMessage = "导出成功"
+            case .failure: importMessage = "导出失败"
+            }
+        }
+        .alert("提示", isPresented: .init(
+            get: { importMessage != nil },
+            set: { if !$0 { importMessage = nil } }
+        )) {
+            Button("确定") { importMessage = nil }
+        } message: {
+            Text(importMessage ?? "")
+        }
     }
 }
 
@@ -176,4 +211,22 @@ struct VisualEffectView: UIViewRepresentable {
     let effect: UIVisualEffect
     func makeUIView(context: Context) -> UIVisualEffectView { UIVisualEffectView(effect: effect) }
     func updateUIView(_ uiView: UIVisualEffectView, context: Context) { }
+}
+
+struct TextFileDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+    var text: String
+
+    init(text: String) { self.text = text }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents,
+              let string = String(data: data, encoding: .utf8)
+        else { throw CocoaError(.fileReadCorruptFile) }
+        text = string
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
 }
