@@ -68,4 +68,39 @@ class TodoStore: ObservableObject {
               let decoded = try? JSONDecoder().decode([TodoItem].self, from: data) else { return }
         items = decoded
     }
+
+    // MARK: - Import / Export
+
+    func importFromMarkdown(_ markdown: String) -> Int {
+        let lines = markdown.components(separatedBy: .newlines)
+        var count = 0
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("- [x] ") {
+                let title = String(trimmed.dropFirst(6))
+                var item = TodoItem(title: title)
+                item.isCompleted = true
+                item.completedAt = Date()
+                items.append(item)
+                count += 1
+            } else if trimmed.hasPrefix("- [ ] ") {
+                let title = String(trimmed.dropFirst(6))
+                items.append(TodoItem(title: title))
+                count += 1
+            } else if trimmed.hasPrefix("- ") {
+                let title = String(trimmed.dropFirst(2))
+                items.append(TodoItem(title: title))
+                count += 1
+            }
+        }
+        if count > 0 { save() }
+        return count
+    }
+
+    func exportToMarkdown() -> String {
+        items.map { item in
+            let marker = item.isCompleted ? "- [x]" : "- [ ]"
+            return "\(marker) \(item.title)"
+        }.joined(separator: "\n")
+    }
 }
