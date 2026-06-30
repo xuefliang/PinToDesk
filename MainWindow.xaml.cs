@@ -664,9 +664,9 @@ namespace PinToDesk
             var activeItems = _items.Where(i => !i.IsCompleted).ToList();
             for (int i = 0; i < activeItems.Count; i++)
             {
-                var container = TodoList.ItemContainerGenerator.ContainerFromIndex(i) as ListViewItem;
+                var container = TodoList.ItemContainerGenerator.ContainerFromIndex(i) as System.Windows.Controls.ListViewItem;
                 if (container == null) continue;
-                var pos = container.TransformToAncestor(TodoList).Transform(new Point(0, 0));
+                var pos = container.TransformToAncestor(TodoList).Transform(new WinPoint(0, 0));
                 if (y < pos.Y + container.ActualHeight / 2)
                     return _items.IndexOf(activeItems[i]);
             }
