@@ -157,7 +157,7 @@ struct ContentView: View {
         }
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: [.data],
+            allowedContentTypes: [.item],
             allowsMultipleSelection: false
         ) { result in
             switch result {
