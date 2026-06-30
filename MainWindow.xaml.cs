@@ -654,7 +654,7 @@ namespace PinToDesk
             e.Handled = true;
         }
 
-        private void TodoList_LostMouseCapture(object sender, MouseEventArgs e)
+        private void TodoList_LostMouseCapture(object sender, WinMouse e)
         {
             if (_isDragging) CancelDrag();
         }
