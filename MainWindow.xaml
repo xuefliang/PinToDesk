@@ -41,8 +41,7 @@
                            FontWeight="SemiBold"
                            Foreground="#333"/>
 
-                <!-- 右侧按钮组：置顶 | 关闭 -->
-                <!-- 右侧按钮组：置顶 | 穿透 | 关闭 -->
+                <!-- 右侧按钮组：置顶 | 导出 | 桌面模式 | 关闭 -->
                 <StackPanel x:Name="TitleButtons"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
@@ -53,12 +52,6 @@
                              Style="{StaticResource TitleBarBtn}"
                              Click="PinBtn_Click"
                              ToolTip="取消置顶"/>
-
-                    <Button x:Name="PassThroughBtn"
-                             Content="⊙"
-                             Style="{StaticResource TitleBarBtn}"
-                             Click="PassThroughBtn_Click"
-                             ToolTip="开启鼠标穿透"/>
 
                     <Button x:Name="ExportBtn"
                              Content="⤓"
