@@ -252,6 +252,7 @@ namespace PinToDesk
         {
             PinBtn.Opacity         = opacity;
             ExportBtn.Opacity      = opacity;
+            ImportBtn.Opacity      = opacity;
             DesktopModeBtn.Opacity = opacity;
             CloseBtn.Opacity       = opacity;
         }
@@ -432,7 +433,7 @@ namespace PinToDesk
             var src = e.OriginalSource as DependencyObject;
             while (src != null)
             {
-                if (src == PinBtn || src == ExportBtn || src == DesktopModeBtn || src == CloseBtn)
+                if (src == PinBtn || src == ExportBtn || src == ImportBtn || src == DesktopModeBtn || src == CloseBtn)
                 {
                     return;
                 }
@@ -554,6 +555,69 @@ namespace PinToDesk
             catch (Exception ex)
             {
                 MessageBox.Show($"导出失败：{ex.Message}", "导出", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void ImportBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                DefaultExt = ".md",
+                Filter = "Markdown 文件 (*.md)|*.md|文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*"
+            };
+
+            if (dialog.ShowDialog() != true) return;
+
+            try
+            {
+                var lines = File.ReadAllLines(dialog.FileName, Encoding.UTF8);
+                var existingTitles = new HashSet<string>(_items.Select(i => i.Title.Trim()),
+                    StringComparer.OrdinalIgnoreCase);
+                var added = 0;
+
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    string? title = null;
+                    bool isCompleted = false;
+
+                    if (trimmed.StartsWith("- [ ] ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        title = trimmed[5..].Trim();
+                    }
+                    else if (trimmed.StartsWith("- [x] ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        title = trimmed[5..].Trim();
+                        isCompleted = true;
+                    }
+
+                    if (string.IsNullOrEmpty(title)) continue;
+                    if (existingTitles.Contains(title)) continue;
+
+                    existingTitles.Add(title);
+                    _items.Add(new TodoItem
+                    {
+                        Title = title,
+                        IsCompleted = isCompleted,
+                        CompletedAt = isCompleted ? DateTime.Now : null
+                    });
+                    added++;
+                }
+
+                if (added > 0)
+                {
+                    _storage.SaveTodos(_items);
+                    ApplyTodoFilter();
+                }
+
+                var msg = added > 0
+                    ? $"成功导入 {added} 个待办项"
+                    : "没有新的待办项需要导入（已全部去重）";
+                MessageBox.Show(msg, "导入", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"导入失败：{ex.Message}", "导入", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

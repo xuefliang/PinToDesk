@@ -59,6 +59,12 @@
                              Click="ExportBtn_Click"
                              ToolTip="导出"/>
 
+                    <Button x:Name="ImportBtn"
+                             Content="⤒"
+                             Style="{StaticResource TitleBarBtn}"
+                             Click="ImportBtn_Click"
+                             ToolTip="导入"/>
+
                     <Button x:Name="DesktopModeBtn"
                              Content="🖵"
                              Style="{StaticResource TitleBarBtn}"
