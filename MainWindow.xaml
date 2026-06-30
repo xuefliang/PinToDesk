@@ -147,6 +147,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
                                     <!-- 完成复选框 -->
@@ -174,9 +175,17 @@
                                                Foreground="#222"
                                                TextWrapping="Wrap"/>
 
+                                    <!-- 拖动手柄（始终可见） -->
+                                    <Button x:Name="DragHandleBtn"
+                                            Grid.Column="3"
+                                            Content="="
+                                            Style="{StaticResource DragHandleBtn}"
+                                            Cursor="SizeAll"
+                                            ToolTip="拖动排序"/>
+
                                     <!-- 编辑按钮（悬停时显示） -->
                                     <Button x:Name="EditBtn"
-                                            Grid.Column="3"
+                                            Grid.Column="4"
                                             Content="✎"
                                             Style="{StaticResource ActionBtn}"
                                             Tag="{Binding Id}"
@@ -186,7 +195,7 @@
 
                                     <!-- 删除按钮（悬停时显示） -->
                                     <Button x:Name="DeleteBtn"
-                                            Grid.Column="4"
+                                            Grid.Column="5"
                                             Content="✕"
                                             Style="{StaticResource ActionBtn}"
                                             Tag="{Binding Id}"

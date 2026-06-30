@@ -599,8 +599,19 @@ namespace PinToDesk
         // ══════════════════════════════════════════════
         private void TodoList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            _dragStart = e.GetPosition(null);
-            _dragItem  = (e.OriginalSource as FrameworkElement)?.DataContext as TodoItem;
+            // 只从拖动手柄触发拖动
+            var src = e.OriginalSource as DependencyObject;
+            while (src != null)
+            {
+                if (src is FrameworkElement fe && fe.Name == "DragHandleBtn")
+                {
+                    _dragStart = e.GetPosition(null);
+                    _dragItem = (e.OriginalSource as FrameworkElement)?.DataContext as TodoItem;
+                    return;
+                }
+                src = System.Windows.Media.VisualTreeHelper.GetParent(src);
+            }
+            _dragItem = null;
         }
 
         private void TodoList_PreviewMouseMove(object sender, WinMouse e)
