@@ -74,33 +74,51 @@ class TodoStore: ObservableObject {
     func importFromMarkdown(_ markdown: String) -> Int {
         let lines = markdown.components(separatedBy: .newlines)
         var count = 0
+        var existingTitles = Set(items.map { $0.title.lowercased() })
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("- [x] ") {
-                let title = String(trimmed.dropFirst(6))
-                var item = TodoItem(title: title)
-                item.isCompleted = true
-                item.completedAt = Date()
-                items.append(item)
-                count += 1
+            var title: String
+            var isCompleted = false
+
+            if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
+                title = String(trimmed.dropFirst(6))
+                isCompleted = true
             } else if trimmed.hasPrefix("- [ ] ") {
-                let title = String(trimmed.dropFirst(6))
-                items.append(TodoItem(title: title))
-                count += 1
+                title = String(trimmed.dropFirst(6))
             } else if trimmed.hasPrefix("- ") {
-                let title = String(trimmed.dropFirst(2))
-                items.append(TodoItem(title: title))
-                count += 1
+                title = String(trimmed.dropFirst(2))
+            } else {
+                continue
             }
+
+            title = title.trimmingCharacters(in: .whitespaces)
+            guard !title.isEmpty else { continue }
+            guard !existingTitles.contains(title.lowercased()) else { continue }
+
+            var item = TodoItem(title: title)
+            item.isCompleted = isCompleted
+            if isCompleted { item.completedAt = Date() }
+            items.append(item)
+            existingTitles.insert(title.lowercased())
+            count += 1
         }
         if count > 0 { save() }
         return count
     }
 
     func exportToMarkdown() -> String {
-        items.map { item in
-            let marker = item.isCompleted ? "- [x]" : "- [ ]"
-            return "\(marker) \(item.title)"
-        }.joined(separator: "\n")
+        var md = "# PinToDesk 导出\n\n"
+        md += "## 待办事项\n"
+        for item in activeItems {
+            md += "- [ ] \(item.title)\n"
+        }
+        let completed = completedItems
+        if !completed.isEmpty {
+            md += "\n## 已完成\n"
+            for item in completed {
+                md += "- [x] \(item.title)\n"
+            }
+        }
+        return md
     }
 }
