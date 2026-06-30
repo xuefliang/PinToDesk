@@ -1,0 +1,94 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [feature/ios-app, main]
+    paths:
+      - 'PinToDesk-iOS/**'
+      - '.github/workflows/ios-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'PinToDesk-iOS/**'
+
+jobs:
+  build:
+    name: Build IPA
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: PinToDesk-iOS
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (compile check)
+        run: |
+          xcodebuild build \
+            -project PinToDesk.xcodeproj \
+            -scheme PinToDesk \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_ALLOWED="NO" \
+            CODE_SIGNING_REQUIRED="NO" | xcpretty
+
+      - name: Archive
+        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+        run: |
+          xcodebuild archive \
+            -project PinToDesk.xcodeproj \
+            -scheme PinToDesk \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/PinToDesk.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_ALLOWED="NO" \
+            CODE_SIGNING_REQUIRED="NO" | xcpretty
+
+      - name: Export IPA
+        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+        run: |
+          mkdir -p $RUNNER_TEMP/export
+          cat > $RUNNER_TEMP/export/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>development</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>compileBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/PinToDesk.xcarchive \
+            -exportPath $RUNNER_TEMP/ipa \
+            -exportOptionsPlist $RUNNER_TEMP/export/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -allowProvisioningDeviceRegistration | xcpretty
+
+      - name: Upload IPA
+        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PinToDesk-iOS-${{ github.sha }}
+          path: ${{ runner.temp }}/ipa/PinToDesk.ipa
+          retention-days: 7

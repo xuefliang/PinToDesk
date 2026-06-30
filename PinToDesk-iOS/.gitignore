@@ -1,0 +1,10 @@
+# Xcode generated
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Build artifacts
+build/
