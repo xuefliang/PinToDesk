@@ -45,7 +45,7 @@ PinToDesk/
 ├── MainWindow.xaml / .xaml.cs      # 主窗口：待办列表、内联输入、置顶/穿透/关闭按钮、ResizeGrip
 ├── EditDialog.xaml / .xaml.cs      # 编辑待办弹窗
 ├── Models/
-│   ├── AppSettings.cs              # 置顶与穿透状态配置模型
+│   ├── AppSettings.cs              # 置顶与置底状态配置模型
 │   └── TodoItem.cs                 # 待办项数据模型（Id / Title / CreatedAt）
 ├── Services/
 │   └── MarkdownStorage.cs          # 读写 %AppData%\PinToDesk\todos.md
@@ -158,7 +158,7 @@ dotnet clean
 - 内容示例：
 
 ```json
-{"IsPinned":false,"IsPassThrough":false}
+{"IsPinned":false,"IsAtBottom":false}
 ```
 
 ### 开机自启

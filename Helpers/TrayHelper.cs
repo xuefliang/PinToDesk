@@ -13,29 +13,29 @@ namespace PinToDesk.Helpers
         private readonly System.Windows.Application _app;
         private readonly Action      _togglePin;
         private readonly Func<bool>  _getIsPinned;
+        private readonly Action      _toggleBottom;
+        private readonly Func<bool>  _getIsAtBottom;
         private readonly Action      _export;
-        private readonly Action      _toggleDesktopMode;
-        private readonly Func<bool>  _getIsDesktopMode;
 
         private readonly ToolStripMenuItem _itemShow;        // 「显示」— 窗口隐藏时可见
         private readonly ToolStripMenuItem _itemHide;        // 「隐藏」— 窗口显示时可见
-        private readonly ToolStripMenuItem _itemPin;         // 「置顶/取消置顶」
+        private readonly ToolStripMenuItem _itemPin;         // 「置顶」
+        private readonly ToolStripMenuItem _itemBottom;      // 「置底」
         private readonly ToolStripMenuItem _itemExport;      // 「导出」
-        private readonly ToolStripMenuItem _itemDesktopMode; // 「桌面模式」
         private readonly System.Windows.Forms.Timer _clickTimer;
 
         public TrayHelper(Window window, System.Windows.Application app,
                           Action togglePin,          Func<bool> getIsPinned,
-                          Action export,             Action toggleDesktopMode,
-                          Func<bool> getIsDesktopMode)
+                          Action toggleBottom,       Func<bool> getIsAtBottom,
+                          Action export)
         {
             _window             = window;
             _app                = app;
             _togglePin          = togglePin;
             _getIsPinned        = getIsPinned;
+            _toggleBottom       = toggleBottom;
+            _getIsAtBottom      = getIsAtBottom;
             _export             = export;
-            _toggleDesktopMode  = toggleDesktopMode;
-            _getIsDesktopMode   = getIsDesktopMode;
 
             // ── 菜单项定义 ──────────────────────────────
             _itemShow = new ToolStripMenuItem("显示");
@@ -56,28 +56,25 @@ namespace PinToDesk.Helpers
             };
 
             _itemPin = new ToolStripMenuItem("置顶");
-            _itemPin.Click += (s, e) =>
+            _itemPin.CheckOnClick = true;
+            _itemPin.Checked = _getIsPinned();
+            _itemPin.CheckedChanged += (s, e) =>
             {
-                _window.Dispatcher.Invoke(() =>
-                {
-                    _window.Show();
-                    _window.Activate();
-                });
-                _togglePin();
-                SyncPinMenuItem();
+                if (_itemPin.Checked != _getIsPinned())
+                    _togglePin();
+            };
+
+            _itemBottom = new ToolStripMenuItem("置底");
+            _itemBottom.CheckOnClick = true;
+            _itemBottom.Checked = _getIsAtBottom();
+            _itemBottom.CheckedChanged += (s, e) =>
+            {
+                if (_itemBottom.Checked != _getIsAtBottom())
+                    _toggleBottom();
             };
 
             _itemExport = new ToolStripMenuItem("导出");
             _itemExport.Click += (s, e) => _export();
-
-            _itemDesktopMode = new ToolStripMenuItem("桌面模式");
-            _itemDesktopMode.CheckOnClick = true;
-            _itemDesktopMode.Checked = _getIsDesktopMode();
-            _itemDesktopMode.CheckedChanged += (s, e) =>
-            {
-                if (_itemDesktopMode.Checked != _getIsDesktopMode())
-                    _toggleDesktopMode();
-            };
 
             var itemAutoStart = new ToolStripMenuItem("开机启动");
             itemAutoStart.CheckOnClick = true;
@@ -92,8 +89,8 @@ namespace PinToDesk.Helpers
             menu.Items.Add(_itemShow);
             menu.Items.Add(_itemHide);
             menu.Items.Add(_itemPin);
+            menu.Items.Add(_itemBottom);
             menu.Items.Add(_itemExport);
-            menu.Items.Add(_itemDesktopMode);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(itemAutoStart);
             menu.Items.Add(new ToolStripSeparator());
@@ -155,9 +152,8 @@ namespace PinToDesk.Helpers
                 }
             };
 
-            // 启动时同步一次菜单文字状态
+            // 启动时同步一次菜单勾选状态
             SyncPinMenuItem();
-            SyncDesktopModeMenuItem();
         }
 
         /// <summary>根据窗口可见状态，切换「显示」/「隐藏」菜单项的可见性</summary>
@@ -169,16 +165,11 @@ namespace PinToDesk.Helpers
             _itemHide.Visible = visible;    // 窗口已显示 → 「隐藏」可见
         }
 
-        /// <summary>由 MainWindow 调用，同步置顶菜单文字</summary>
+        /// <summary>由 MainWindow 调用，同步置顶/置底菜单勾选状态</summary>
         public void SyncPinMenuItem()
         {
-            _itemPin.Text = _getIsPinned() ? "取消置顶" : "置顶";
-        }
-
-        /// <summary>由 MainWindow 调用，同步桌面模式菜单勾选状态</summary>
-        public void SyncDesktopModeMenuItem()
-        {
-            _itemDesktopMode.Checked = _getIsDesktopMode();
+            _itemPin.Checked    = _getIsPinned();
+            _itemBottom.Checked = _getIsAtBottom();
         }
 
         public static void SetAutoStart(bool enable)

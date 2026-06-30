@@ -38,15 +38,15 @@ namespace PinToDesk
         private WinPoint _resizeStart;
         private double   _resizeStartW, _resizeStartH;
 
-        // 置顶 / 桌面模式（独立状态）
-        private bool _isPinned      = false;
-        private bool _isDesktopMode = false;
-        private bool _allowHide     = false;   // 用户主动隐藏时设为 true
+        // 置顶 / 置底（互斥状态，同为 false 时为普通层级）
+        private bool _isPinned  = false;
+        private bool _isAtBottom = false;
+        private bool _allowHide = false;   // 用户主动隐藏时设为 true
 
         // 托盘引用（用于同步状态）
         private TrayHelper? _tray;
-        public bool IsPinned      => _isPinned;
-        public bool IsDesktopMode => _isDesktopMode;
+        public bool IsPinned   => _isPinned;
+        public bool IsAtBottom => _isAtBottom;
         public void SetTray(TrayHelper tray) => _tray = tray;
         public void ExportFromTray() => ExportBtn_Click(null, new RoutedEventArgs());
 
@@ -131,7 +131,7 @@ namespace PinToDesk
             Loaded += (s, e) =>
             {
                 UpdateEmptyPlaceholder();
-                SetTitleButtonsOpacity((_isPinned || _isDesktopMode) ? 1 : 0);
+                SetTitleButtonsOpacity((_isPinned || _isAtBottom) ? 1 : 0);
             };
 
             IsVisibleChanged += (s, e) =>
@@ -187,9 +187,9 @@ namespace PinToDesk
                     return IntPtr.Zero;
                 }
 
-                if (_isDesktopMode)
+                if (_isAtBottom)
                 {
-                    // 强制窗口保持在桌面层
+                    // 强制窗口保持在桌面层（置底）
                     if ((wp.flags & SWP_NOZORDER) == 0 && wp.hwndInsertAfter != HWND_BOTTOM)
                     {
                         wp.hwndInsertAfter = HWND_BOTTOM;
@@ -245,16 +245,15 @@ namespace PinToDesk
         private void TitleBar_MouseEnter(object sender, WinMouse e) => SetTitleButtonsOpacity(1);
         private void TitleBar_MouseLeave(object sender, WinMouse e)
         {
-            if (!_isPinned && !_isDesktopMode) SetTitleButtonsOpacity(0);
+            if (!_isPinned && !_isAtBottom) SetTitleButtonsOpacity(0);
         }
 
         private void SetTitleButtonsOpacity(double opacity)
         {
-            PinBtn.Opacity         = opacity;
-            ExportBtn.Opacity      = opacity;
-            ImportBtn.Opacity      = opacity;
-            DesktopModeBtn.Opacity = opacity;
-            CloseBtn.Opacity       = opacity;
+            PinBtn.Opacity    = opacity;
+            ExportBtn.Opacity = opacity;
+            ImportBtn.Opacity = opacity;
+            CloseBtn.Opacity  = opacity;
         }
 
         // ResizeGrip 区域悬停：控制 Grip 显示
@@ -289,68 +288,85 @@ namespace PinToDesk
 
         private void PinBtn_Click(object sender, RoutedEventArgs e)
         {
-            TogglePinState();
-            _tray?.SyncPinMenuItem();
+            ToggleZOrder();
         }
 
         internal void TogglePinFromTray()
         {
-            TogglePinState();
+            SetPinned(!_isPinned);
         }
 
-        private void TogglePinState()
+        internal void ToggleBottomFromTray()
         {
-            _isPinned    = !_isPinned;
+            SetAtBottom(!_isAtBottom);
+        }
+
+        /// <summary>循环切换窗口层级：普通 → 置顶 → 置底 → 普通</summary>
+        private void ToggleZOrder()
+        {
+            if (!_isPinned && !_isAtBottom)
+            {
+                _isPinned = true;
+                _isAtBottom = false;
+            }
+            else if (_isPinned)
+            {
+                _isPinned = false;
+                _isAtBottom = true;
+            }
+            else
+            {
+                _isPinned = false;
+                _isAtBottom = false;
+            }
+            ApplyZOrder();
+            SaveSettings();
+            _tray?.SyncPinMenuItem();
+        }
+
+        private void SetPinned(bool value)
+        {
+            if (_isPinned == value) return;
+            _isPinned = value;
+            if (_isPinned) _isAtBottom = false;
+            ApplyZOrder();
+            SaveSettings();
+            _tray?.SyncPinMenuItem();
+        }
+
+        private void SetAtBottom(bool value)
+        {
+            if (_isAtBottom == value) return;
+            _isAtBottom = value;
+            if (_isAtBottom) _isPinned = false;
+            ApplyZOrder();
+            SaveSettings();
+            _tray?.SyncPinMenuItem();
+        }
+
+        private void ApplyZOrder()
+        {
             this.Topmost = _isPinned;
 
             if (_isPinned)
             {
                 PinBtn.Content = "📍";
-                PinBtn.ToolTip = "取消置顶";
+                PinBtn.ToolTip = "置底";
                 SetTitleButtonsOpacity(1);
             }
-            else
+            else if (_isAtBottom)
             {
-                PinBtn.Content = "📌";
-                PinBtn.ToolTip = "置顶";
-                if (!_isDesktopMode) SetTitleButtonsOpacity(0);
-            }
-            SaveSettings();
-        }
-
-        // ══════════════════════════════════════════════
-        // 常驻桌面显示模式
-        // ══════════════════════════════════════════════
-        private void DesktopModeBtn_Click(object sender, RoutedEventArgs e)
-        {
-            ToggleDesktopMode();
-        }
-
-        internal void ToggleDesktopModeFromTray()
-        {
-            ToggleDesktopMode();
-        }
-
-        private void ToggleDesktopMode()
-        {
-            _isDesktopMode = !_isDesktopMode;
-
-            if (_isDesktopMode)
-            {
-                DesktopModeBtn.Content = "🖥";
-                DesktopModeBtn.ToolTip = "关闭桌面模式";
+                PinBtn.Content = "🖵";
+                PinBtn.ToolTip = "取消置底";
                 SetTitleButtonsOpacity(1);
                 SendToBottom();
             }
             else
             {
-                DesktopModeBtn.Content = "🖵";
-                DesktopModeBtn.ToolTip = "常驻桌面显示";
-                if (!_isPinned) SetTitleButtonsOpacity(0);
+                PinBtn.Content = "📌";
+                PinBtn.ToolTip = "置顶";
+                SetTitleButtonsOpacity(0);
             }
-
-            _tray?.SyncDesktopModeMenuItem();
-            SaveSettings();
         }
 
         private void SendToBottom()
@@ -433,7 +449,7 @@ namespace PinToDesk
             var src = e.OriginalSource as DependencyObject;
             while (src != null)
             {
-                if (src == PinBtn || src == ExportBtn || src == ImportBtn || src == DesktopModeBtn || src == CloseBtn)
+                if (src == PinBtn || src == ExportBtn || src == ImportBtn || src == CloseBtn)
                 {
                     return;
                 }
@@ -706,43 +722,22 @@ namespace PinToDesk
                     if (settings != null)
                     {
                         _isPinned = settings.IsPinned;
-                        _isDesktopMode = settings.IsDesktopMode;
+                        _isAtBottom = settings.IsAtBottom;
                     }
                 }
                 else
                 {
                     _isPinned = false;
-                    _isDesktopMode = false;
+                    _isAtBottom = false;
                 }
             }
             catch
             {
                 _isPinned = false;
-                _isDesktopMode = false;
+                _isAtBottom = false;
             }
 
-            this.Topmost = _isPinned;
-            if (_isPinned)
-            {
-                PinBtn.Content = "📍";
-                PinBtn.ToolTip = "取消置顶";
-            }
-            else
-            {
-                PinBtn.Content = "📌";
-                PinBtn.ToolTip = "置顶";
-            }
-
-            if (_isDesktopMode)
-            {
-                DesktopModeBtn.Content = "🖥";
-                DesktopModeBtn.ToolTip = "关闭桌面模式";
-            }
-            else
-            {
-                DesktopModeBtn.Content = "🖵";
-                DesktopModeBtn.ToolTip = "常驻桌面显示";
-            }
+            ApplyZOrder();
         }
 
         private void SaveSettings()
@@ -758,7 +753,7 @@ namespace PinToDesk
                 var settings = new AppSettings
                 {
                     IsPinned = _isPinned,
-                    IsDesktopMode = _isDesktopMode
+                    IsAtBottom = _isAtBottom
                 };
                 var json = JsonSerializer.Serialize(settings);
                 File.WriteAllText(settingsPath, json, Encoding.UTF8);

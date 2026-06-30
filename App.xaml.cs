@@ -20,11 +20,11 @@ namespace PinToDesk
             _tray = new TrayHelper(
                 win,
                 this,
-                win.TogglePinFromTray,          // 托盘点击时调用
-                () => win.IsPinned,             // 托盘读取当前状态
-                win.ExportFromTray,             // 托盘导出
-                win.ToggleDesktopModeFromTray,  // 托盘桌面模式
-                () => win.IsDesktopMode         // 托盘读取桌面模式状态
+                win.TogglePinFromTray,          // 托盘切换置顶
+                () => win.IsPinned,             // 托盘读取置顶状态
+                win.ToggleBottomFromTray,       // 托盘切换置底
+                () => win.IsAtBottom,           // 托盘读取置底状态
+                win.ExportFromTray              // 托盘导出
             );
             win.SetTray(_tray);                 // MainWindow 持有 tray 引用，可主动同步菜单
         }

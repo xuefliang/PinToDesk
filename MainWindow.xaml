@@ -41,17 +41,17 @@
                            FontWeight="SemiBold"
                            Foreground="#333"/>
 
-                <!-- 右侧按钮组：置顶 | 导出 | 桌面模式 | 关闭 -->
+                <!-- 右侧按钮组：置顶/置底 | 导出 | 导入 | 关闭 -->
                 <StackPanel x:Name="TitleButtons"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             Margin="0,0,4,0">
 
                     <Button x:Name="PinBtn"
-                             Content="📍"
+                             Content="📌"
                              Style="{StaticResource TitleBarBtn}"
                              Click="PinBtn_Click"
-                             ToolTip="取消置顶"/>
+                             ToolTip="置顶"/>
 
                     <Button x:Name="ExportBtn"
                              Content="⤒"
@@ -64,12 +64,6 @@
                              Style="{StaticResource TitleBarBtn}"
                              Click="ImportBtn_Click"
                              ToolTip="导入"/>
-
-                    <Button x:Name="DesktopModeBtn"
-                             Content="🖵"
-                             Style="{StaticResource TitleBarBtn}"
-                             Click="DesktopModeBtn_Click"
-                             ToolTip="常驻桌面显示"/>
 
                     <Button x:Name="CloseBtn"
                              Content="✕"
