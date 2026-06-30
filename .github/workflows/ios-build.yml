@@ -2,7 +2,7 @@ name: iOS Build
 
 on:
   push:
-    branches: [feature/ios-app, main]
+    branches: [ios, main]
     paths:
       - 'PinToDesk-iOS/**'
       - '.github/workflows/ios-build.yml'
@@ -13,7 +13,7 @@ on:
 
 jobs:
   build:
-    name: Build IPA
+    name: Build & Archive
     runs-on: macos-latest
     defaults:
       run:
@@ -23,8 +23,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+      - name: Show Xcode version
+        run: xcodebuild -version
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -32,19 +32,18 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build (compile check)
+      - name: Compile (debug, no signing)
         run: |
           xcodebuild build \
             -project PinToDesk.xcodeproj \
             -scheme PinToDesk \
             -sdk iphoneos \
-            -configuration Release \
+            -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_ALLOWED="NO" \
             CODE_SIGNING_REQUIRED="NO" | xcpretty
 
-      - name: Archive
-        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+      - name: Archive (unsigned)
         run: |
           xcodebuild archive \
             -project PinToDesk.xcodeproj \
@@ -56,8 +55,52 @@ jobs:
             CODE_SIGNING_ALLOWED="NO" \
             CODE_SIGNING_REQUIRED="NO" | xcpretty
 
+      - name: Export unsigned .app bundle
+        run: |
+          mkdir -p $RUNNER_TEMP/export
+          cp -R "$RUNNER_TEMP/PinToDesk.xcarchive/Products/Applications/PinToDesk.app" $RUNNER_TEMP/export/
+          cd $RUNNER_TEMP/export
+          zip -r PinToDesk.zip PinToDesk.app
+
+      - name: Upload artifact (.app bundle)
+        uses: actions/upload-artifact@v4
+        with:
+          name: PinToDesk-iOS-${{ github.sha }}
+          path: ${{ runner.temp }}/export/PinToDesk.zip
+          retention-days: 7
+
+  # 在提供签名凭据时额外生成 IPA
+  signed-ipa:
+    name: Signed IPA (requires secrets)
+    needs: build
+    if: secrets.APPLE_TEAM_ID != ''
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: PinToDesk-iOS
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Archive (signed)
+        run: |
+          xcodebuild archive \
+            -project PinToDesk.xcodeproj \
+            -scheme PinToDesk \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/PinToDesk.xcarchive \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGN_STYLE=Automatic | xcpretty
+
       - name: Export IPA
-        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
         run: |
           mkdir -p $RUNNER_TEMP/export
           cat > $RUNNER_TEMP/export/ExportOptions.plist <<EOF
@@ -68,7 +111,7 @@ jobs:
             <key>method</key>
             <string>development</string>
             <key>signingStyle</key>
-            <string>manual</string>
+            <string>automatic</string>
             <key>stripSwiftSymbols</key>
             <true/>
             <key>teamID</key>
@@ -82,13 +125,11 @@ jobs:
             -archivePath $RUNNER_TEMP/PinToDesk.xcarchive \
             -exportPath $RUNNER_TEMP/ipa \
             -exportOptionsPlist $RUNNER_TEMP/export/ExportOptions.plist \
-            -allowProvisioningUpdates \
-            -allowProvisioningDeviceRegistration | xcpretty
+            -allowProvisioningUpdates | xcpretty
 
       - name: Upload IPA
-        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: PinToDesk-iOS-${{ github.sha }}
+          name: PinToDesk-iOS-signed-${{ github.sha }}
           path: ${{ runner.temp }}/ipa/PinToDesk.ipa
           retention-days: 7
