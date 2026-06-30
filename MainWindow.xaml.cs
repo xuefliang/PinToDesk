@@ -37,6 +37,9 @@ namespace PinToDesk
         private WinPoint  _dragStart;
         private TodoItem? _dragItem;
         private bool      _isDragging;
+        private double    _dragStartListY;     // 拖拽开始时光标在 ListView 中的 Y
+        private int       _activeStartIdx;     // 拖拽项在 activeItems 中的起始索引
+        private double    _itemHeightEstimate = 38; // 缓存项高度
 
         // 窗口调整大小
         private bool _isResizing;
@@ -614,6 +617,17 @@ namespace PinToDesk
                     _dragStart = e.GetPosition(null);
                     _dragItem = fe.DataContext as TodoItem;
                     _isDragging = false;
+
+                    // 记录起始位置和项高度（用于平滑跟随光标）
+                    _dragStartListY = e.GetPosition(TodoList).Y;
+                    var activeItems = _items.Where(i => !i.IsCompleted).ToList();
+                    _activeStartIdx = activeItems.IndexOf(_dragItem);
+                    for (int i = Math.Max(0, _activeStartIdx - 1); i <= Math.Min(_activeStartIdx + 1, _items.Count - 1); i++)
+                    {
+                        var c = TodoList.ItemContainerGenerator.ContainerFromIndex(i) as System.Windows.Controls.ListViewItem;
+                        if (c?.ActualHeight > 10) { _itemHeightEstimate = c.ActualHeight; break; }
+                    }
+
                     TodoList.CaptureMouse();
                     return;
                 }
@@ -641,9 +655,16 @@ namespace PinToDesk
                 _isDragging = true;
             }
 
-            int newIdx = CalculateDropIndex(e.GetPosition(TodoList).Y);
+            // 基于光标从起始位置的累积偏移计算目标位置，避免 Move 后容器抖动
+            double yDelta = e.GetPosition(TodoList).Y - _dragStartListY;
+            int positionsDelta = (int)Math.Round(yDelta / _itemHeightEstimate);
+
+            var activeItems = _items.Where(i => !i.IsCompleted).ToList();
+            int newActiveIdx = Math.Max(0, Math.Min(activeItems.Count - 1, _activeStartIdx + positionsDelta));
+
             int oldIdx = _items.IndexOf(_dragItem);
-            if (oldIdx >= 0 && newIdx >= 0 && oldIdx != newIdx)
+            int newIdx = _items.IndexOf(activeItems[newActiveIdx]);
+            if (oldIdx >= 0 && newIdx >= 0 && newIdx != oldIdx)
                 _items.Move(oldIdx, newIdx);
         }
 
@@ -657,21 +678,6 @@ namespace PinToDesk
         private void TodoList_LostMouseCapture(object sender, WinMouse e)
         {
             if (_isDragging) CancelDrag();
-        }
-
-        private int CalculateDropIndex(double y)
-        {
-            var activeItems = _items.Where(i => !i.IsCompleted).ToList();
-            for (int i = 0; i < activeItems.Count; i++)
-            {
-                var container = TodoList.ItemContainerGenerator.ContainerFromIndex(i) as System.Windows.Controls.ListViewItem;
-                if (container == null) continue;
-                var pos = container.TransformToAncestor(TodoList).Transform(new WinPoint(0, 0));
-                if (y < pos.Y + container.ActualHeight / 2)
-                    return _items.IndexOf(activeItems[i]);
-            }
-            var last = activeItems.LastOrDefault();
-            return last != null ? _items.IndexOf(last) + 1 : 0;
         }
 
         private void CancelDrag()
