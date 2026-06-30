@@ -8,6 +8,22 @@ struct ContentView: View {
     @State private var showEditSheet = false
     @State private var editingItem: TodoItem?
 
+    private var markdownExport: String {
+        var md = "# PinToDesk 导出\n\n"
+        md += "## 待办事项\n"
+        for item in store.activeItems {
+            md += "- [ ] \(item.title)\n"
+        }
+        let completed = store.completedItems
+        if !completed.isEmpty {
+            md += "\n## 已完成\n"
+            for item in completed {
+                md += "- [x] \(item.title)\n"
+            }
+        }
+        return md
+    }
+
     var body: some View {
         ZStack {
             TranslucentBackground()
@@ -19,6 +35,14 @@ struct ContentView: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.primary)
                     Spacer()
+
+                    ShareLink(item: markdownExport, preview: SharePreview("PinToDesk 导出")) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(width: 32, height: 32)
+
                     Button(action: { showCompleted.toggle() }) {
                         Image(systemName: showCompleted ? "eye.slash" : "eye")
                             .font(.system(size: 15))
