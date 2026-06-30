@@ -155,25 +155,20 @@ struct ContentView: View {
                 EditTodoView(item: item)
             }
         }
-        .fileImporter(
-            isPresented: $showImporter,
-            allowedContentTypes: [.item],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                guard url.startAccessingSecurityScopedResource() else { return }
-                defer { url.stopAccessingSecurityScopedResource() }
-                if let data = try? Data(contentsOf: url),
-                   let text = String(data: data, encoding: .utf8) {
-                    let count = store.importFromMarkdown(text)
-                    importMessage = "导入了 \(count) 条新待办"
-                } else {
-                    importMessage = "导入失败：文件读取错误"
+        .onChange(of: showImporter) { visible in
+            if visible {
+                presentDocumentPicker { url in
+                    showImporter = false
+                    if let data = try? Data(contentsOf: url),
+                       let text = String(data: data, encoding: .utf8) {
+                        let count = store.importFromMarkdown(text)
+                        importMessage = "导入了 \(count) 条新待办"
+                    } else {
+                        importMessage = "导入失败：文件读取错误"
+                    }
+                } onCancel: {
+                    showImporter = false
                 }
-            case .failure:
-                importMessage = "导入失败"
             }
         }
         .fileExporter(
@@ -213,6 +208,40 @@ struct VisualEffectView: UIViewRepresentable {
     let effect: UIVisualEffect
     func makeUIView(context: Context) -> UIVisualEffectView { UIVisualEffectView(effect: effect) }
     func updateUIView(_ uiView: UIVisualEffectView, context: Context) { }
+}
+
+private var pickerDelegate = PickerDelegate()
+
+private func presentDocumentPicker(onPick: @escaping (URL) -> Void, onCancel: @escaping () -> Void) {
+    pickerDelegate.onPick = onPick
+    pickerDelegate.onCancel = onCancel
+
+    let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: true)
+    picker.allowsMultipleSelection = false
+    picker.delegate = pickerDelegate
+
+    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+          let root = windowScene.windows.first?.rootViewController else { return }
+
+    var top = root
+    while let presented = top.presentedViewController {
+        top = presented
+    }
+    top.present(picker, animated: true)
+}
+
+private class PickerDelegate: NSObject, UIDocumentPickerDelegate {
+    var onPick: ((URL) -> Void)?
+    var onCancel: (() -> Void)?
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { return }
+        onPick?(url)
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        onCancel?()
+    }
 }
 
 struct TextFileDocument: FileDocument {
