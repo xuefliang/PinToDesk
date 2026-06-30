@@ -1,0 +1,87 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build -c Release --no-restore
+
+    - name: Publish (framework-dependent, single file)
+      run: >
+        dotnet publish PinToDesk.csproj -c Release -r win-x64
+        --self-contained false -p:PublishSingleFile=true
+        -o "Publish/FrameworkDependent"
+
+    - name: Upload framework-dependent artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: PinToDesk-FrameworkDependent
+        path: Publish/FrameworkDependent/
+        if-no-files-found: error
+
+    - name: Publish (self-contained, single file)
+      run: >
+        dotnet publish PinToDesk.csproj -c Release -r win-x64
+        --self-contained true -p:PublishSingleFile=true
+        -p:PublishReadyToRun=true -p:IncludeNativeLibrariesForSelfExtract=true
+        -o "Publish/SelfContained"
+
+    - name: Upload self-contained artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: PinToDesk-SelfContained
+        path: Publish/SelfContained/
+        if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Download framework-dependent artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: PinToDesk-FrameworkDependent
+        path: release/FrameworkDependent
+
+    - name: Download self-contained artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: PinToDesk-SelfContained
+        path: release/SelfContained
+
+    - name: Create release archive
+      shell: pwsh
+      run: |
+        Compress-Archive -Path release/FrameworkDependent/* -DestinationPath PinToDesk-${{ github.ref_name }}-FrameworkDependent.zip
+        Compress-Archive -Path release/SelfContained/* -DestinationPath PinToDesk-${{ github.ref_name }}-SelfContained.zip
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          PinToDesk-${{ github.ref_name }}-FrameworkDependent.zip
+          PinToDesk-${{ github.ref_name }}-SelfContained.zip
+        generate_release_notes: true

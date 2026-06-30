@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -7,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
 using PinToDesk.Helpers;
@@ -38,6 +40,9 @@ namespace PinToDesk
         private readonly ObservableCollection<TodoItem> _items = new();
         private readonly MarkdownStorage _storage;
 
+        // 集合视图（过滤已完成条目）
+        private ICollectionView? _todoView;
+
         // 拖拽排序
         private WinPoint  _dragStart;
         private TodoItem? _dragItem;
@@ -47,19 +52,35 @@ namespace PinToDesk
         private WinPoint _resizeStart;
         private double   _resizeStartW, _resizeStartH;
 
-        // 置顶 / 穿透（独立状态）
+        // 置顶 / 穿透 / 桌面模式（独立状态）
         private bool _isPinned      = false;   // 默认不置顶
         private bool _isPassThrough = false;  // 鼠标穿透，独立于置顶
+        private bool _isDesktopMode = false;
         private System.Windows.Threading.DispatcherTimer? _passThroughTimer;
+        private System.Windows.Threading.DispatcherTimer? _desktopModeTimer;
 
         // 托盘引用（用于同步状态）
         private TrayHelper? _tray;
         public bool IsPinned      => _isPinned;
         public bool IsPassThrough => _isPassThrough;
+        public bool IsDesktopMode => _isDesktopMode;
         public void SetTray(TrayHelper tray) => _tray = tray;
+        public void ExportFromTray() => ExportBtn_Click(null, new RoutedEventArgs());
 
         // Win32 结构与接口定义
         private const int WM_MOVING = 0x0216;
+        private const int WM_SYSCOMMAND = 0x0112;
+        private const int SC_MINIMIZE   = 0xF020;
+        private static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+            int X, int Y, int cx, int cy, uint uFlags);
+
+        private const uint SWP_NOSIZE       = 0x0001;
+        private const uint SWP_NOMOVE       = 0x0002;
+        private const uint SWP_NOACTIVATE   = 0x0010;
+        private const uint SWP_SHOWWINDOW   = 0x0040;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT
@@ -104,6 +125,10 @@ namespace PinToDesk
                 _items.Add(item);
             TodoList.ItemsSource = _items;
 
+            // 集合视图过滤已完成条目
+            _todoView = CollectionViewSource.GetDefaultView(_items);
+            _todoView.Filter = o => o is TodoItem item && !item.IsCompleted;
+
             // 监听集合变化，同步空列表占位符
             _items.CollectionChanged += (s, e) => UpdateEmptyPlaceholder();
 
@@ -119,10 +144,10 @@ namespace PinToDesk
             // 初始化占位符状态
             UpdateEmptyPlaceholder();
 
-            // 根据置顶或穿透状态决定标题栏按钮初始透明度
+            // 根据状态决定标题栏按钮初始透明度
             Loaded += (s, e) => { 
                 UpdateEmptyPlaceholder(); 
-                SetTitleButtonsOpacity((_isPinned || _isPassThrough) ? 1 : 0); 
+                SetTitleButtonsOpacity((_isPinned || _isPassThrough || _isDesktopMode) ? 1 : 0); 
             };
         }
 
@@ -146,6 +171,16 @@ namespace PinToDesk
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
+            if (msg == WM_SYSCOMMAND && _isDesktopMode)
+            {
+                int cmd = wParam.ToInt32() & 0xFFF0;
+                if (cmd == SC_MINIMIZE)
+                {
+                    handled = true;
+                    return IntPtr.Zero;
+                }
+            }
+
             if (msg == WM_MOVING)
             {
                 // 获取当前鼠标所在的屏幕工作区（物理像素）
@@ -194,14 +229,15 @@ namespace PinToDesk
         private void TitleBar_MouseEnter(object sender, WinMouse e) => SetTitleButtonsOpacity(1);
         private void TitleBar_MouseLeave(object sender, WinMouse e)
         {
-            // 置顶或穿透状态下，标题栏按钮保持可见
-            if (!_isPinned && !_isPassThrough) SetTitleButtonsOpacity(0);
+            if (!_isPinned && !_isPassThrough && !_isDesktopMode) SetTitleButtonsOpacity(0);
         }
 
         private void SetTitleButtonsOpacity(double opacity)
         {
             PinBtn.Opacity         = opacity;
             PassThroughBtn.Opacity = opacity;
+            ExportBtn.Opacity      = opacity;
+            DesktopModeBtn.Opacity = opacity;
             CloseBtn.Opacity       = opacity;
         }
 
@@ -252,7 +288,7 @@ namespace PinToDesk
             {
                 PinBtn.Content = "📌";
                 PinBtn.ToolTip = "置顶";
-                if (!_isPassThrough) SetTitleButtonsOpacity(0);
+                if (!_isPassThrough && !_isDesktopMode) SetTitleButtonsOpacity(0);
             }
             SaveSettings();
         }
@@ -288,7 +324,7 @@ namespace PinToDesk
             {
                 PassThroughBtn.Content = "⊙";
                 PassThroughBtn.ToolTip = "开启鼠标穿透";
-                if (!_isPinned) SetTitleButtonsOpacity(0);
+                if (!_isPinned && !_isDesktopMode) SetTitleButtonsOpacity(0);
                 
                 StopPassThroughTimer();
                 
@@ -344,6 +380,66 @@ namespace PinToDesk
                     SetWindowLong(hwnd, GWL_EXSTYLE, extendedStyle | WS_EX_TRANSPARENT);
                 }
             }
+        }
+
+        // ══════════════════════════════════════════════
+        // 常驻桌面显示模式
+        // ══════════════════════════════════════════════
+        private void DesktopModeBtn_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleDesktopMode();
+        }
+
+        internal void ToggleDesktopModeFromTray()
+        {
+            ToggleDesktopMode();
+        }
+
+        private void ToggleDesktopMode()
+        {
+            _isDesktopMode = !_isDesktopMode;
+
+            if (_isDesktopMode)
+            {
+                DesktopModeBtn.Content = "🖥";
+                DesktopModeBtn.ToolTip = "关闭桌面模式";
+                SetTitleButtonsOpacity(1);
+                StartDesktopModeTimer();
+                SendToBottom();
+            }
+            else
+            {
+                DesktopModeBtn.Content = "🖵";
+                DesktopModeBtn.ToolTip = "常驻桌面显示";
+                if (!_isPinned && !_isPassThrough && !_isDesktopMode) SetTitleButtonsOpacity(0);
+                StopDesktopModeTimer();
+            }
+
+            _tray?.SyncDesktopModeMenuItem();
+            SaveSettings();
+        }
+
+        private void StartDesktopModeTimer()
+        {
+            if (_desktopModeTimer == null)
+            {
+                _desktopModeTimer = new System.Windows.Threading.DispatcherTimer();
+                _desktopModeTimer.Interval = TimeSpan.FromMilliseconds(500);
+                _desktopModeTimer.Tick += (s, e) => SendToBottom();
+            }
+            _desktopModeTimer.Start();
+        }
+
+        private void StopDesktopModeTimer()
+        {
+            _desktopModeTimer?.Stop();
+        }
+
+        private void SendToBottom()
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0,
+                SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
         }
 
         // ══════════════════════════════════════════════
@@ -421,11 +517,11 @@ namespace PinToDesk
             // 如果不在新增（内联输入）过程中，忽略
             if (InlineInputArea.Visibility != Visibility.Visible) return;
 
-            // 检查点击的原点，如果是三个功能按钮，不进行完成操作
+            // 检查点击的原点，如果是功能按钮，不进行完成操作
             var src = e.OriginalSource as DependencyObject;
             while (src != null)
             {
-                if (src == PinBtn || src == PassThroughBtn || src == CloseBtn)
+                if (src == PinBtn || src == PassThroughBtn || src == ExportBtn || src == DesktopModeBtn || src == CloseBtn)
                 {
                     return;
                 }
@@ -512,13 +608,69 @@ namespace PinToDesk
 
         private void UpdateEmptyPlaceholder()
         {
+            int activeCount = _items.Count(i => !i.IsCompleted);
             EmptyPlaceholder.Visibility =
-                _items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                activeCount == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ══════════════════════════════════════════════
         // 编辑 / 删除
         // ══════════════════════════════════════════════
+        private void ExportBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                FileName = $"todos_{DateTime.Now:yyyyMMdd}",
+                DefaultExt = ".md",
+                Filter = "Markdown 文件 (*.md)|*.md|文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*"
+            };
+
+            if (dialog.ShowDialog() != true) return;
+
+            try
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("# PinToDesk 导出");
+                sb.AppendLine();
+                sb.AppendLine("## 待办事项");
+                foreach (var item in _items.Where(i => !i.IsCompleted))
+                {
+                    sb.AppendLine($"- [ ] {item.Title}");
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("## 已完成");
+                foreach (var item in _items.Where(i => i.IsCompleted).OrderBy(i => i.CompletedAt))
+                {
+                    sb.AppendLine($"- [x] {item.Title}");
+                }
+
+                File.WriteAllText(dialog.FileName, sb.ToString(), Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"导出失败：{ex.Message}", "导出", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void CompleteBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var id = (Guid)((WinButton)sender).Tag;
+            var item = _items.FirstOrDefault(i => i.Id == id);
+            if (item == null) return;
+
+            item.IsCompleted = true;
+            item.CompletedAt = DateTime.Now;
+            _storage.SaveTodos(_items);
+            ApplyTodoFilter();
+        }
+
+        private void ApplyTodoFilter()
+        {
+            _todoView?.Refresh();
+            UpdateEmptyPlaceholder();
+        }
+
         private void EditBtn_Click(object sender, RoutedEventArgs e)
         {
             var id   = (Guid)((WinButton)sender).Tag;
@@ -585,6 +737,8 @@ namespace PinToDesk
             {
                 return IsScreenPointInElement(PinBtn, screenX, screenY) ||
                        IsScreenPointInElement(PassThroughBtn, screenX, screenY) ||
+                       IsScreenPointInElement(ExportBtn, screenX, screenY) ||
+                       IsScreenPointInElement(DesktopModeBtn, screenX, screenY) ||
                        IsScreenPointInElement(CloseBtn, screenX, screenY);
             }
             catch
@@ -633,18 +787,21 @@ namespace PinToDesk
                     {
                         _isPinned = settings.IsPinned;
                         _isPassThrough = settings.IsPassThrough;
+                        _isDesktopMode = settings.IsDesktopMode;
                     }
                 }
                 else
                 {
                     _isPinned = false;
                     _isPassThrough = false;
+                    _isDesktopMode = false;
                 }
             }
             catch
             {
                 _isPinned = false;
                 _isPassThrough = false;
+                _isDesktopMode = false;
             }
 
             // 应用置顶状态
@@ -673,6 +830,19 @@ namespace PinToDesk
                 PassThroughBtn.ToolTip = "开启鼠标穿透";
                 StopPassThroughTimer();
             }
+
+            // 应用桌面模式
+            if (_isDesktopMode)
+            {
+                DesktopModeBtn.Content = "🖥";
+                DesktopModeBtn.ToolTip = "关闭桌面模式";
+                StartDesktopModeTimer();
+            }
+            else
+            {
+                DesktopModeBtn.Content = "🖵";
+                DesktopModeBtn.ToolTip = "常驻桌面显示";
+            }
         }
 
         private void SaveSettings()
@@ -688,7 +858,8 @@ namespace PinToDesk
                 var settings = new AppSettings
                 {
                     IsPinned = _isPinned,
-                    IsPassThrough = _isPassThrough
+                    IsPassThrough = _isPassThrough,
+                    IsDesktopMode = _isDesktopMode
                 };
                 var json = JsonSerializer.Serialize(settings);
                 File.WriteAllText(settingsPath, json, Encoding.UTF8);

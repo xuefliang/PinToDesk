@@ -4,5 +4,6 @@ namespace PinToDesk.Models
     {
         public bool IsPinned { get; set; } = false;
         public bool IsPassThrough { get; set; } = false;
+        public bool IsDesktopMode { get; set; } = false;
     }
 }

@@ -14,16 +14,23 @@ namespace PinToDesk.Helpers
         private readonly Func<bool>  _getIsPinned;
         private readonly Action      _togglePassThrough;
         private readonly Func<bool>  _getIsPassThrough;
+        private readonly Action      _export;
+        private readonly Action      _toggleDesktopMode;
+        private readonly Func<bool>  _getIsDesktopMode;
 
         private readonly ToolStripMenuItem _itemShow;        // 「显示」— 窗口隐藏时可见
         private readonly ToolStripMenuItem _itemHide;        // 「隐藏」— 窗口显示时可见
         private readonly ToolStripMenuItem _itemPin;         // 「置顶/取消置顶」
         private readonly ToolStripMenuItem _itemPassThrough; // 「鼠标穿透/关闭穿透」
+        private readonly ToolStripMenuItem _itemExport;      // 「导出」
+        private readonly ToolStripMenuItem _itemDesktopMode; // 「桌面模式」
         private readonly System.Windows.Forms.Timer _clickTimer;
 
         public TrayHelper(Window window, System.Windows.Application app,
                           Action togglePin,          Func<bool> getIsPinned,
-                          Action togglePassThrough,  Func<bool> getIsPassThrough)
+                          Action togglePassThrough,  Func<bool> getIsPassThrough,
+                          Action export,             Action toggleDesktopMode,
+                          Func<bool> getIsDesktopMode)
         {
             _window             = window;
             _app                = app;
@@ -31,6 +38,9 @@ namespace PinToDesk.Helpers
             _getIsPinned        = getIsPinned;
             _togglePassThrough  = togglePassThrough;
             _getIsPassThrough   = getIsPassThrough;
+            _export             = export;
+            _toggleDesktopMode  = toggleDesktopMode;
+            _getIsDesktopMode   = getIsDesktopMode;
 
             // ── 菜单项定义 ──────────────────────────────
             _itemShow = new ToolStripMenuItem("显示");
@@ -69,6 +79,18 @@ namespace PinToDesk.Helpers
                 SyncPassThroughMenuItem();
             };
 
+            _itemExport = new ToolStripMenuItem("导出");
+            _itemExport.Click += (s, e) => _export();
+
+            _itemDesktopMode = new ToolStripMenuItem("桌面模式");
+            _itemDesktopMode.CheckOnClick = true;
+            _itemDesktopMode.Checked = _getIsDesktopMode();
+            _itemDesktopMode.CheckedChanged += (s, e) =>
+            {
+                if (_itemDesktopMode.Checked != _getIsDesktopMode())
+                    _toggleDesktopMode();
+            };
+
             var itemAutoStart = new ToolStripMenuItem("开机启动");
             itemAutoStart.CheckOnClick = true;
             itemAutoStart.Checked      = IsAutoStartEnabled();
@@ -83,6 +105,8 @@ namespace PinToDesk.Helpers
             menu.Items.Add(_itemHide);
             menu.Items.Add(_itemPin);
             menu.Items.Add(_itemPassThrough);
+            menu.Items.Add(_itemExport);
+            menu.Items.Add(_itemDesktopMode);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(itemAutoStart);
             menu.Items.Add(new ToolStripSeparator());
@@ -144,9 +168,10 @@ namespace PinToDesk.Helpers
                 }
             };
 
-            // 启动时同步一次置顶与穿透的菜单文字状态
+            // 启动时同步一次菜单文字状态
             SyncPinMenuItem();
             SyncPassThroughMenuItem();
+            SyncDesktopModeMenuItem();
         }
 
         /// <summary>根据窗口可见状态，切换「显示」/「隐藏」菜单项的可见性</summary>
@@ -168,6 +193,12 @@ namespace PinToDesk.Helpers
         public void SyncPassThroughMenuItem()
         {
             _itemPassThrough.Text = _getIsPassThrough() ? "关闭鼠标穿透" : "鼠标穿透";
+        }
+
+        /// <summary>由 MainWindow 调用，同步桌面模式菜单勾选状态</summary>
+        public void SyncDesktopModeMenuItem()
+        {
+            _itemDesktopMode.Checked = _getIsDesktopMode();
         }
 
         public static void SetAutoStart(bool enable)

@@ -60,6 +60,18 @@
                              Click="PassThroughBtn_Click"
                              ToolTip="开启鼠标穿透"/>
 
+                    <Button x:Name="ExportBtn"
+                             Content="⤓"
+                             Style="{StaticResource TitleBarBtn}"
+                             Click="ExportBtn_Click"
+                             ToolTip="导出"/>
+
+                    <Button x:Name="DesktopModeBtn"
+                             Content="🖵"
+                             Style="{StaticResource TitleBarBtn}"
+                             Click="DesktopModeBtn_Click"
+                             ToolTip="常驻桌面显示"/>
+
                     <Button x:Name="CloseBtn"
                              Content="✕"
                              Style="{StaticResource TitleBarBtn}"
@@ -136,20 +148,32 @@
                                 <Grid Margin="8,5">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
+                                    <!-- 完成复选框 -->
+                                    <Button x:Name="CompleteBtn"
+                                            Grid.Column="0"
+                                            Content="☐"
+                                            Style="{StaticResource ActionBtn}"
+                                            Tag="{Binding Id}"
+                                            Click="CompleteBtn_Click"
+                                            Width="24" Height="24"
+                                            Margin="0,0,6,0"
+                                            ToolTip="标记完成"/>
+
                                     <!-- 左侧圆点标识，多行时顶部对齐 -->
-                                    <Ellipse Grid.Column="0"
+                                    <Ellipse Grid.Column="1"
                                              Width="6" Height="6"
                                              Fill="#88888888"
                                              VerticalAlignment="Top"
                                              Margin="0,5,8,0"/>
 
                                     <!-- 待办文本：自动换行，无字数限制 -->
-                                    <TextBlock Grid.Column="1"
+                                    <TextBlock Grid.Column="2"
                                                Text="{Binding Title}"
                                                FontSize="13"
                                                Foreground="#222"
@@ -157,7 +181,7 @@
 
                                     <!-- 编辑按钮（悬停时显示） -->
                                     <Button x:Name="EditBtn"
-                                            Grid.Column="2"
+                                            Grid.Column="3"
                                             Content="✎"
                                             Style="{StaticResource ActionBtn}"
                                             Tag="{Binding Id}"
@@ -167,7 +191,7 @@
 
                                     <!-- 删除按钮（悬停时显示） -->
                                     <Button x:Name="DeleteBtn"
-                                            Grid.Column="3"
+                                            Grid.Column="4"
                                             Content="✕"
                                             Style="{StaticResource ActionBtn}"
                                             Tag="{Binding Id}"

@@ -31,9 +31,30 @@ namespace PinToDesk.Services
             {
                 var trimmed = line.Trim();
                 if (string.IsNullOrWhiteSpace(trimmed)) continue;
-                // Simple format: "- Title" (markdown list item)
-                var title = trimmed.StartsWith("- ") ? trimmed.Substring(2) : trimmed;
-                todos.Add(new TodoItem { Title = title });
+
+                bool isCompleted = false;
+                string title = trimmed;
+
+                if (trimmed.StartsWith("- [x] ", StringComparison.OrdinalIgnoreCase))
+                {
+                    isCompleted = true;
+                    title = trimmed.Substring(6);
+                }
+                else if (trimmed.StartsWith("- [ ] "))
+                {
+                    title = trimmed.Substring(6);
+                }
+                else if (trimmed.StartsWith("- "))
+                {
+                    title = trimmed.Substring(2);
+                }
+
+                todos.Add(new TodoItem
+                {
+                    Title = title,
+                    IsCompleted = isCompleted,
+                    CompletedAt = isCompleted ? DateTime.Now : null
+                });
             }
             return todos;
         }
@@ -43,7 +64,8 @@ namespace PinToDesk.Services
             var sb = new StringBuilder();
             foreach (var item in items)
             {
-                sb.AppendLine($"- {item.Title}");
+                var marker = item.IsCompleted ? "- [x]" : "- [ ]";
+                sb.AppendLine($"{marker} {item.Title}");
             }
             File.WriteAllText(_filePath, sb.ToString(), Encoding.UTF8);
         }

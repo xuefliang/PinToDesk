@@ -16,14 +16,17 @@ namespace PinToDesk
             var win = new MainWindow();
             win.Show();
 
-            // 传入置顶和穿透回调，建立 TrayHelper 后反向注入给 MainWindow
+            // 传入回调，建立 TrayHelper 后反向注入给 MainWindow
             _tray = new TrayHelper(
                 win,
                 this,
                 win.TogglePinFromTray,          // 托盘点击时调用
                 () => win.IsPinned,             // 托盘读取当前状态
                 win.TogglePassThroughFromTray,  // 托盘点击穿透时调用
-                () => win.IsPassThrough         // 托盘读取当前穿透状态
+                () => win.IsPassThrough,        // 托盘读取当前穿透状态
+                win.ExportFromTray,             // 托盘导出
+                win.ToggleDesktopModeFromTray,  // 托盘桌面模式
+                () => win.IsDesktopMode         // 托盘读取桌面模式状态
             );
             win.SetTray(_tray);                 // MainWindow 持有 tray 引用，可主动同步菜单
         }
