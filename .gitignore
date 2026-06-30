@@ -1,4 +1,4 @@
-﻿# .NET build output
+# .NET build output
 bin/
 obj/
 
@@ -27,3 +27,6 @@ desktop.ini
 
 # Logs
 *.log
+
+# Git worktrees
+.worktrees/
