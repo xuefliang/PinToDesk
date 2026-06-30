@@ -1,6 +1,12 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+extension UTType {
+    static var markdown: UTType {
+        UTType(importedAs: "net.daringfireball.markdown")
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject private var store: TodoStore
     @State private var showAddAlert = false
@@ -26,7 +32,7 @@ struct ContentView: View {
 
                     // 导入按钮
                     Button(action: { showImporter = true }) {
-                        Image(systemName: "folder")
+                        Image(systemName: "square.and.arrow.down")
                             .font(.system(size: 14))
                             .foregroundColor(.secondary)
                     }
@@ -34,7 +40,7 @@ struct ContentView: View {
 
                     // 导出按钮
                     Button(action: { showExporter = true }) {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: "square.and.arrow.up.on.square")
                             .font(.system(size: 14))
                             .foregroundColor(.secondary)
                     }
@@ -157,7 +163,7 @@ struct ContentView: View {
         }
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: [.plainText],
+            allowedContentTypes: [.markdown, .plainText],
             allowsMultipleSelection: false
         ) { result in
             switch result {
@@ -179,7 +185,7 @@ struct ContentView: View {
         .fileExporter(
             isPresented: $showExporter,
             document: TextFileDocument(text: store.exportToMarkdown()),
-            contentType: .plainText,
+            contentType: .markdown,
             defaultFilename: "PinToDesk-导出"
         ) { result in
             switch result {
@@ -216,7 +222,7 @@ struct VisualEffectView: UIViewRepresentable {
 }
 
 struct TextFileDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.plainText] }
+    static var readableContentTypes: [UTType] { [.markdown, .plainText] }
     var text: String
 
     init(text: String) { self.text = text }
