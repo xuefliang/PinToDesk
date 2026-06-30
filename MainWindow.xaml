@@ -54,13 +54,13 @@
                              ToolTip="取消置顶"/>
 
                     <Button x:Name="ExportBtn"
-                             Content="⤓"
+                             Content="⤒"
                              Style="{StaticResource TitleBarBtn}"
                              Click="ExportBtn_Click"
                              ToolTip="导出"/>
 
                     <Button x:Name="ImportBtn"
-                             Content="⤒"
+                             Content="⤓"
                              Style="{StaticResource TitleBarBtn}"
                              Click="ImportBtn_Click"
                              ToolTip="导入"/>
