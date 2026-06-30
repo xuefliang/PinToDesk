@@ -94,7 +94,6 @@
                                 MouseDoubleClick="TodoList_MouseDoubleClick"
                                 PreviewMouseLeftButtonDown="TodoList_PreviewMouseLeftButtonDown"
                                 PreviewMouseMove="TodoList_PreviewMouseMove"
-                                PreviewMouseLeftButtonUp="TodoList_PreviewMouseLeftButtonUp"
                                 LostMouseCapture="TodoList_LostMouseCapture">
 
                         <!-- 使用自定义 ScrollViewer（细滚动条，自动隐藏） -->
